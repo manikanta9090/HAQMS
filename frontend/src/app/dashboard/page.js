@@ -14,14 +14,14 @@ export default function Dashboard() {
   const { user, token, API_BASE_URL, logout } = useAuth();
   const router = useRouter();
 
-  // Navigation Guard
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user]);
+// Navigation Guard
+   useEffect(() => {
+     if (!user) {
+       router.push('/login');
+     }
+   }, [user, router]);
 
-  if (!user) return null;
+   if (!user) return null;
 
   // Global State
   const [activeTab, setActiveTab] = useState(user.role === 'ADMIN' ? 'reports' : user.role === 'RECEPTIONIST' ? 'patients' : 'appointments');
@@ -95,12 +95,12 @@ export default function Dashboard() {
     }
   };
 
-  // Trigger Patient List Fetch (Every keystroke trigger re-renders parent! - Performance bug)
-  useEffect(() => {
-    if (user.role === 'RECEPTIONIST' || user.role === 'ADMIN') {
-      fetchPatients(1);
-    }
-  }, [patientSearch, patientGender]);
+// Trigger Patient List Fetch (Every keystroke trigger re-renders parent! - Performance bug)
+   useEffect(() => {
+     if (user.role === 'RECEPTIONIST' || user.role === 'ADMIN') {
+       fetchPatients(1);
+     }
+   }, [patientSearch, patientGender, user.role]);
 
   // Fetch Doctors for booking drop-down
   const fetchDoctorsDropdown = async () => {

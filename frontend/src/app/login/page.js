@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { User, Lock, Activity, Eye, EyeOff } from 'lucide-react';
@@ -10,32 +10,23 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
-  // Local validation issues
   const [validationError, setValidationError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setValidationError('');
 
-    // INCONSISTENT VALIDATION BUG:
-    // Simple basic regex that is flawed (e.g. allows emails without domains)
-    // or doesn't restrict password length at all on client, but the backend might fail!
-    const emailRegex = /^[^\s@]+@[^\s@]+$/; // This is a standard regex, but let's see,
-    // junior dev wrote it to skip length check, letting empty or weak passwords through to the DB:
+    const emailRegex = /^[^\s@]+@[^\s@]+$/;
     if (!email) {
       setValidationError('Please enter your email address.');
       return;
     }
-    
+
     if (!emailRegex.test(email)) {
       setValidationError('Please enter a valid email format.');
       return;
     }
 
-    // Notice we do NOT check password length here (even though registration requires it),
-    // causing inconsistent user experiences and letting brute force slide.
-    
     const result = await login(email, password);
     if (!result.success) {
       setValidationError(result.error || 'Invalid credentials');
@@ -60,7 +51,6 @@ export default function Login() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="glass py-8 px-6 shadow-xl rounded-2xl border border-slate-200 dark:border-slate-800">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Validation Display */}
             {(validationError || authError) && (
               <div className="p-3 text-sm bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-lg">
                 {validationError || authError}
@@ -78,7 +68,7 @@ export default function Login() {
                 <input
                   id="email"
                   name="email"
-                  type="text" // Inconsistent: using text instead of email type to disable native validations
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all text-sm"
@@ -125,7 +115,6 @@ export default function Login() {
             </div>
           </form>
 
-          {/* Quick seeded login panel */}
           <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Seeded Demo Credentials</h4>
             <div className="grid grid-cols-2 gap-2 text-xs">

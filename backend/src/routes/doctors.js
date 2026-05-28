@@ -7,43 +7,35 @@ const prisma = new PrismaClient();
 
 // GET /api/doctors
 // Retrieve list of doctors with special search filtering
-// SECURITY BUG: SQL Injection vulnerability in the search parameter!
-// Uses queryRawUnsafe with string concatenation instead of parameterized inputs.
 router.get('/', authenticate, async (req, res) => {
   try {
     const { search, specialization } = req.query;
 
-    let query = 'SELECT * FROM "Doctor"';
-    const conditions = [];
+    const where = {};
 
     if (search) {
-      // Direct string interpolation - VULNERABLE TO SQL INJECTION!
-      // Example exploit: search=House%' UNION SELECT id, email, password, name, role, '09:00', '17:00', 0, id FROM "User" --
-      conditions.push(`name ILIKE '%${search}%'`);
+      where.name = {
+        contains: search,
+        mode: 'insensitive',
+      };
     }
 
     if (specialization && specialization !== 'All') {
-      conditions.push(`specialization = '${specialization}'`);
+      where.specialization = specialization;
     }
 
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
+    const doctors = await prisma.doctor.findMany({
+      where: where,
+    });
 
-    console.log(`[SQL-DEBUG] Executing Query: ${query}`);
-    const doctors = await prisma.$queryRawUnsafe(query);
-
-    // Inconsistent API formatting (directly sending array)
     res.json(doctors);
   } catch (error) {
-    // Leaks query syntax details to candidate/attacker
     res.status(500).json({ error: 'Database execution failure', sqlMessage: error.message });
   }
 });
 
 // GET /api/doctors/stats
 // Returns aggregation details about available doctors
-// PERFORMANCE BUG: Sequential async calls instead of Promise.all()
 router.get('/stats', authenticate, async (req, res) => {
   try {
     const start = Date.now();

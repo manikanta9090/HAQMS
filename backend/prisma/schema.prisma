@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  RECEPTIONIST
+}
+
+enum AppointmentStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum QueueTokenStatus {
+  WAITING
+  CALLING
+  COMPLETED
+  SKIPPED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(RECEPTIONIST)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([email])
+}
+
+model Patient {
+  id            String   @id @default(uuid())
+  name          String
+  email         String?
+  phoneNumber   String
+  age           Int
+  gender        String
+  medicalHistory String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  appointments  Appointment[]
+  queueTokens   QueueToken[]
+  
+  @@index([phoneNumber])
+  @@index([email])
+}
+
+model Doctor {
+  id             String   @id @default(uuid())
+  name           String
+  specialization String
+  department     String
+  consultationFee Float
+  experience     Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  appointments   Appointment[]
+  queueTokens    QueueToken[]
+  
+  @@index([specialization])
+  @@index([department])
+}
+
+model Appointment {
+  id          String   @id @default(uuid())
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  patientId   String
+  doctor      Doctor   @relation(fields: [doctorId], references: [id])
+  doctorId    String
+  appointmentDate DateTime
+  reason      String?
+  status      AppointmentStatus @default(PENDING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  queueToken  QueueToken? @relation("AppointmentQueueToken")
+  
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([appointmentDate])
+  @@index([status])
+  
+  // Prevent double booking for the same doctor at the same time
+  @@unique([doctorId, appointmentDate])
+}
+
+model QueueToken {
+  id          String   @id @default(uuid())
+  tokenNumber Int
+  date        DateTime
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  patientId   String
+  doctor      Doctor   @relation(fields: [doctorId], references: [id])
+  doctorId    String
+  appointment Appointment? @relation("AppointmentQueueToken", fields: [appointmentId], references: [id])
+  appointmentId String? @unique
+  status      QueueTokenStatus @default(WAITING)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([date])
+  
+  // Ensure token numbers are unique per doctor per day
+  @@unique([doctorId, date, tokenNumber])
+}
