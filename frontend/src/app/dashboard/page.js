@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/common/Navbar';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { 
   Users, CalendarDays, Activity, Search, Sparkles, UserPlus, 
   Trash2, ClipboardList, TrendingUp, DollarSign, Award, Clock,
@@ -11,20 +12,10 @@ import {
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { user, token, API_BASE_URL, logout } = useAuth();
+  const { user, token, loading, API_BASE_URL, logout } = useAuth();
   const router = useRouter();
 
-// Navigation Guard
-   useEffect(() => {
-     if (!user) {
-       router.push('/login');
-     }
-   }, [user, router]);
-
-   if (!user) return null;
-
-  // Global State
-  const [activeTab, setActiveTab] = useState(user.role === 'ADMIN' ? 'reports' : user.role === 'RECEPTIONIST' ? 'patients' : 'appointments');
+  const [activeTab, setActiveTab] = useState('reports');
 
   // ==========================================
   // STATE FOR RECEPTIONIST WORKFLOWS
@@ -34,7 +25,7 @@ export default function Dashboard() {
   const [patientSearch, setPatientSearch] = useState('');
   const [patientGender, setPatientGender] = useState('All');
   const [patientsPagination, setPatientsPagination] = useState({ page: 1, totalPages: 1 });
-  
+
   // Registration Form
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -58,24 +49,21 @@ export default function Dashboard() {
   // ==========================================
   const [doctorAppointments, setDoctorAppointments] = useState([]);
   const [doctorQueue, setDoctorQueue] = useState([]);
-  const [selectedPatientHistory, setSelectedPatientHistory] = useState(null);
 
   // ==========================================
   // STATE FOR ADMIN WORKFLOWS
   // ==========================================
+  const [selectedPatientHistory, setSelectedPatientHistory] = useState(null);
   const [adminReportData, setAdminReportData] = useState(null);
   const [adminReportLoading, setAdminReportLoading] = useState(false);
   const [adminSearchQuery, setAdminSearchQuery] = useState('');
 
   // ==========================================
-  // RECEPTIONIST FUNCTIONS
+  // RECEPTIONIST FUNCTIONS (must be before useEffect)
   // ==========================================
-  
-  // Fetch Patients List
   const fetchPatients = async (page = 1) => {
     setPatientsLoading(true);
     try {
-      // Inefficient memory pagination called from client
       const res = await fetch(`${API_BASE_URL}/patients?page=${page}&limit=5&search=${patientSearch}&gender=${patientGender}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -95,19 +83,13 @@ export default function Dashboard() {
     }
   };
 
-// Trigger Patient List Fetch (Every keystroke trigger re-renders parent! - Performance bug)
-   useEffect(() => {
-     if (user.role === 'RECEPTIONIST' || user.role === 'ADMIN') {
-       fetchPatients(1);
-     }
-   }, [patientSearch, patientGender, user.role]);
-
-  // Fetch Doctors for booking drop-down
   const fetchDoctorsDropdown = async () => {
+    if (!token) return;
     try {
       const res = await fetch(`${API_BASE_URL}/doctors`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (!res.ok) return;
       const data = await res.json();
       setDoctorsList(data);
     } catch (e) {
@@ -115,22 +97,13 @@ export default function Dashboard() {
     }
   };
 
-useEffect(() => {
-     fetchDoctorsDropdown();
-   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Handle Patient Registration
   const handleRegisterPatient = async (e) => {
     e.preventDefault();
     setRegMessage('');
-
-    // INCONSISTENT VALIDATION: Receptionist form doesn't validate telephone structure on client, 
-    // leading to database pollution (e.g. text telephone values)
     if (!regName || !regPhone || !regAge) {
       setRegMessage('Error: Name, Age and Phone number are required.');
       return;
     }
-
     try {
       const res = await fetch(`${API_BASE_URL}/patients`, {
         method: 'POST',
@@ -147,17 +120,14 @@ useEffect(() => {
           medicalHistory: regHistory
         })
       });
-
       const data = await res.json();
       if (res.ok) {
         setRegMessage('Success: Patient registered successfully!');
-        // Clear fields
         setRegName('');
         setRegEmail('');
         setRegPhone('');
         setRegAge('');
         setRegHistory('');
-        // Refresh directory
         fetchPatients(1);
       } else {
         setRegMessage(`Error: ${data.error || 'Failed to register'}`);
@@ -167,16 +137,13 @@ useEffect(() => {
     }
   };
 
-  // Handle Appointment Booking
   const handleBookAppointment = async (e) => {
     e.preventDefault();
     setBookingMessage('');
-
     if (!bookingPatientId || !bookingDoctorId || !bookingDate) {
       setBookingMessage('Error: All booking fields are required.');
       return;
     }
-
     try {
       const res = await fetch(`${API_BASE_URL}/appointments`, {
         method: 'POST',
@@ -191,12 +158,11 @@ useEffect(() => {
           reason: bookingReason
         })
       });
-
       const data = await res.json();
       if (res.ok) {
         setBookingMessage('Success: Appointment booked successfully!');
         setBookingReason('');
-        if (user.role === 'DOCTOR') fetchDoctorWorklist();
+        if (user?.role === 'DOCTOR') fetchDoctorWorklist();
       } else {
         setBookingMessage(`Error: ${data.error || 'Failed to book'}`);
       }
@@ -205,7 +171,6 @@ useEffect(() => {
     }
   };
 
-  // Delete Patient (Bypassed authorization admin check!)
   const handleDeletePatient = async (id) => {
     if (!confirm('Are you sure you want to delete this patient record?')) return;
     try {
@@ -225,7 +190,6 @@ useEffect(() => {
     }
   };
 
-  // Queue Token Checkin (Race condition API!)
   const handleQueueCheckin = async (patientId, doctorId, appointmentId = null) => {
     setCheckinMessage('');
     try {
@@ -240,7 +204,7 @@ useEffect(() => {
       const data = await res.json();
       if (res.ok) {
         setCheckinMessage(`Checked in! Generated Token #${data.token.tokenNumber}`);
-        if (user.role === 'DOCTOR') fetchDoctorWorklist();
+        if (user?.role === 'DOCTOR') fetchDoctorWorklist();
       } else {
         setCheckinMessage(`Error check-in: ${data.error}`);
       }
@@ -250,16 +214,13 @@ useEffect(() => {
   };
 
   // ==========================================
-  // DOCTOR WORKFLOW FUNCTIONS
+  // DOCTOR WORKFLOW FUNCTIONS (must be before useEffect)
   // ==========================================
   const fetchDoctorWorklist = async () => {
-    if (user.role !== 'DOCTOR') return;
+    if (user?.role !== 'DOCTOR') return;
     try {
-      // Find matching doctor from doctors dropdown using user ID link
       const matchedDoc = doctorsList.find(d => d.userId === user.id);
       if (!matchedDoc) return;
-
-      // 1. Fetch appointments for this doctor (N+1 database queries triggers inside server)
       const appRes = await fetch(`${API_BASE_URL}/appointments?doctorId=${matchedDoc.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -267,26 +228,16 @@ useEffect(() => {
       if (appData.success) {
         setDoctorAppointments(appData.appointments);
       }
-
-      // 2. Fetch queue list for this doctor today
       const queueRes = await fetch(`${API_BASE_URL}/queue?doctorId=${matchedDoc.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const queueData = await queueRes.json();
       setDoctorQueue(queueData);
-
     } catch (e) {
       console.error(e);
     }
   };
 
-useEffect(() => {
-     if (user.role === 'DOCTOR' && doctorsList.length > 0) {
-       fetchDoctorWorklist();
-     }
-   }, [doctorsList, user.role]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Update token status (WAITING -> CALLING -> COMPLETED / SKIPPED)
   const handleUpdateQueueStatus = async (tokenId, newStatus) => {
     try {
       const res = await fetch(`${API_BASE_URL}/queue/${tokenId}`, {
@@ -305,7 +256,6 @@ useEffect(() => {
     }
   };
 
-  // Complete consultation of an appointment
   const handleCompleteAppointment = async (appId) => {
     try {
       const res = await fetch(`${API_BASE_URL}/appointments/${appId}`, {
@@ -325,14 +275,11 @@ useEffect(() => {
   };
 
   // ==========================================
-  // ADMIN SYSTEM WORKFLOWS
+  // ADMIN SYSTEM WORKFLOWS (must be before useEffect)
   // ==========================================
-  
-  // Slow report generator fetch
   const generateSystemReport = async () => {
     setAdminReportLoading(true);
     try {
-      // Calls slow nested aggregation endpoint
       const res = await fetch(`${API_BASE_URL}/reports/doctor-stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -347,7 +294,6 @@ useEffect(() => {
     }
   };
 
-  // Search Doctors (SQL Injection vulnerable API!)
   const searchPhysiciansAdmin = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/doctors?search=${adminSearchQuery}`, {
@@ -363,6 +309,45 @@ useEffect(() => {
       console.error(e);
     }
   };
+
+  // ==========================================
+  // EFFECTS - ALL MUST RUN AFTER FUNCTION DEFS
+  // ==========================================
+// Navigation Guard
+   useEffect(() => {
+     if (!loading && !user) {
+       router.push('/login');
+     }
+   }, [user, loading, router]);
+
+// Set default tab based on role (after user loads)
+  useEffect(() => {
+    if (user?.role === 'ADMIN') setActiveTab('reports');
+    else if (user?.role === 'RECEPTIONIST') setActiveTab('patients');
+    else if (user?.role === 'DOCTOR') setActiveTab('appointments');
+  }, [user?.role]);
+
+// Fetch Patients List
+   useEffect(() => {
+     if (token && user && (user.role === 'RECEPTIONIST' || user.role === 'ADMIN')) {
+       fetchPatients(1);
+     }
+   }, [patientSearch, patientGender, user, token]);
+
+// Fetch Doctors for booking drop-down
+   useEffect(() => {
+     if (token) fetchDoctorsDropdown();
+   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+// Doctor worklist fetch
+   useEffect(() => {
+     if (user?.role === 'DOCTOR' && doctorsList.length > 0 && token) {
+       fetchDoctorWorklist();
+     }
+   }, [doctorsList, user, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+// Early return AFTER all hooks are defined
+   if (loading || !user) return null;
 
   return (
     <div className="min-h-screen flex flex-col">

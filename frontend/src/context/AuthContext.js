@@ -191,21 +191,19 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    return ( <
-        AuthContext.Provider value = {
-            {
-                user,
-                token,
-                loading,
-                error,
-                login,
-                register,
-                logout,
-                API_BASE_URL,
-            }
-        } >
-        { children } <
-        /AuthContext.Provider>
+    return (
+        <AuthContext.Provider value={{
+            user,
+            token,
+            loading,
+            error,
+            login,
+            register,
+            logout,
+            API_BASE_URL,
+        }}>
+            {children}
+        </AuthContext.Provider>
     );
 };
 
