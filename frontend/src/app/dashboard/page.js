@@ -115,9 +115,9 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    fetchDoctorsDropdown();
-  }, []);
+useEffect(() => {
+     fetchDoctorsDropdown();
+   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle Patient Registration
   const handleRegisterPatient = async (e) => {
@@ -280,11 +280,11 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    if (user.role === 'DOCTOR' && doctorsList.length > 0) {
-      fetchDoctorWorklist();
-    }
-  }, [doctorsList]);
+useEffect(() => {
+     if (user.role === 'DOCTOR' && doctorsList.length > 0) {
+       fetchDoctorWorklist();
+     }
+   }, [doctorsList, user.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update token status (WAITING -> CALLING -> COMPLETED / SKIPPED)
   const handleUpdateQueueStatus = async (tokenId, newStatus) => {
